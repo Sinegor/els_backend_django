@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from usersApp.models import User, UsersKind
+from usersApp.models import User, UsersKind, ClientUserInterface
 from django.db import models
+from django.http import HttpResponse, HttpRequest
 # for phone number vflidation:
 #from django.core.validators import RegexValidator
 
@@ -21,6 +22,19 @@ class RegistrationSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
+class ClientInterfaceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClientUserInterface
+        fields = ['full_name', 'phone', 'user_name', ]
+    def save(self):
+        client = ClientUserInterface(full_name = self.validated_data['full_name'],
+                                     phone = self.validated_data['phone'],
+                                     user_name = self.validated_data['user_name'],
+    
+                                     )
+        client.save()
+        return client
+        
 
 
 

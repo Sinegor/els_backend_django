@@ -10,8 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import datetime
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,7 +24,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-b&-s=8jv9u@vpir@v^6)g8)ih-5vg3*2$d0(k-(1h6)-fnyx1j'
+
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -33,13 +38,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny'
     ],
-# 'DEFAULT_AUTHENTICATION_CLASSES': [
-#     'rest_framework_simplejwt.authentication.JWTAuthentication',
-# ]
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+    'rest_framework_simplejwt.authentication.JWTAuthentication',
+]
 }
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=1),
+}
 
-# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -51,9 +59,12 @@ INSTALLED_APPS = [
     'usersApp',
     'location_field.apps.DefaultConfig',
     'rest_framework',
+#    'rest_framework.authtoken',
     'corsheaders',
+    'rest_framework_simplejwt'
     
-]
+    
+] 
 
 
 
@@ -158,4 +169,5 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'usersApp.User'
+#AUTH_PROFILE_MODEL = []
 
