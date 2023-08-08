@@ -35,26 +35,44 @@ class UserCreationForm(forms.ModelForm):
 class CustomUserAdmin(UserAdmin):
     add_form = UserCreationForm
     list_display = ('id', 'username', 'kind_of_user')
-    list_display_links = ('username', 'kind_of_user')
+    list_display_links = ('username',)
     fieldsets = (
         *UserAdmin.fieldsets,
         (
             'Custom Field Heading',# визуализируется в качестве логического раздела формы
             {
                 'fields':(
-                    'kind_of_user',
+                    'kind_of_user', 'email_confirm',
                 ),
             }, 
         ),
         
     )
+    readonly_fields = ('kind_of_user', 'email_confirm')
     #add_form = UserCreationForm
 
 class ClientUserInterfaceAdmin(admin.ModelAdmin):
     list_display = ('user_name', 'full_name',)
+    fields =('name_of_interface', 'user_name', 
+             'full_name', 'phone', 'payment_method',
+             'current_requests', 'history_of_requests')
+    readonly_fields = ('name_of_interface', 'user_name',
+                       'current_requests', 'history_of_requests')
+    
+class LawyerUserInterfaceAdmin(admin.ModelAdmin):
+    list_display = ('user_name', 'full_name', 'is_advokat', 'legal_education_check', 'current_city')
+    fields = ('name_of_interface', 'user_name', 'full_name',
+              'phone', 'current_applications',
+              'history_of_applications',  'payment_method',
+              'is_advokat', 'legal_education_check',
+              'preferred_location', 'specialization', 
+              'incompetence', 'current_city', 'current_location')
+    readonly_fields = ('name_of_interface', 'user_name',
+                       'current_applications', 'history_of_applications', )
 
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(UsersKind)
 admin.site.register(ClientUserInterface, ClientUserInterfaceAdmin)
+admin.site.register (LawyerUserInterface, LawyerUserInterfaceAdmin)
 
 # Register your models here.
