@@ -3,7 +3,8 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from usersApp.models import User, UsersKind, ClientUserInterface, LawyerUserInterface
+from usersApp.models import User, UsersKind, ClientUserInterface, \
+                            LawyerUserInterface, FieldsOfLaw
 
 
 # Данный класс переопределяется, если мы хотим переопределить форму для создания юзера. В данном случае в юзер модели мы
@@ -70,9 +71,14 @@ class LawyerUserInterfaceAdmin(admin.ModelAdmin):
     readonly_fields = ('name_of_interface', 'user_name',
                        'current_applications', 'history_of_applications', )
 
+class FieldsOfLawAdmin(admin.ModelAdmin):
+    list_display = ('area',)
+    fields = ('area', 'type')
+
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(UsersKind)
 admin.site.register(ClientUserInterface, ClientUserInterfaceAdmin)
 admin.site.register (LawyerUserInterface, LawyerUserInterfaceAdmin)
+admin.site.register(FieldsOfLaw, FieldsOfLawAdmin)
 
 # Register your models here.

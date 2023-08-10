@@ -22,7 +22,9 @@ class UsersKind(models.Model):
     
 class User (AbstractUser):
     class Meta:
-        verbose_name = 'Все пользователи'
+        verbose_name = 'Пользователь'
+        verbose_name_plural = 'Все пользователи'
+
     def __str__(self):
         return(self.username)
     
@@ -65,15 +67,35 @@ class ClientUserInterface(models.Model):
     def __str__(self):
         return (f"{self.user_name}: {self.full_name}")
 
-    
+class FieldsOfLaw (models.Model):
+    class Meta:
+        verbose_name = "Отрасль"
+        verbose_name_plural = 'Отрасли права'
+    area = models.CharField(max_length=70, blank=False, verbose_name='сфера отношений', unique=True)
+    type = models.CharField(max_length=25, blank=False, verbose_name='область права')
+    def __str__(self):
+        return self.area
+
+# class Specialization (models.Model):
+#     lawyer = models.ForeignKey('LawyerUserInterface', on_delete=models.CASCADE, to_field='username')
+#     area_law = models.ForeignKey(FieldsOfLaw, on_delete=models.CASCADE, to_field='area')
+
+# class incompetence (models.Model):
+#     lawyer = models.ForeignKey('LawyerUserInterface', on_delete=models.CASCADE, to_field='username')
+#     area_law = models.ForeignKey(FieldsOfLaw, on_delete=models.CASCADE, to_field='area')
+
 class LawyerUserInterface(models.Model):
+
+    class Meta:
+            verbose_name = "Пользователь-юрист"
+            verbose_name_plural = 'Пользователи-юристы'
+    
     def get_default_type_user():
         return UsersKind.objects.get(id=2)
     
-
     def __str__(self):
-        return (f"{self.user_id}: {self.full_name}")
-    
+        return (f"{self.user_name}: {self.name_of_interface}")
+
     phoneNumberRegex = RegexValidator(regex = r"^\+?1?\d{8,15}$")
     name_of_interface = models.ForeignKey(UsersKind, 
                                           default=get_default_type_user,
@@ -88,22 +110,22 @@ class LawyerUserInterface(models.Model):
                                    )
     full_name = models.CharField (max_length=200, blank=False)
     phone = models.CharField(max_length=16, validators=[phoneNumberRegex])
-    payment_method = models.CharField(max_length=200, blank=True, default=None,) 
+    payment_method = models.CharField(max_length=200, blank=True, ) 
     current_applications = models.CharField(max_length=200, blank=True,
-                                             default=None, verbose_name="Текущие заказы")
-    history_of_applications = models.CharField(max_length=200, blank=True, default=None,
+                                            verbose_name="Текущие заказы")
+    history_of_applications = models.CharField(max_length=200, blank=True,
                                                verbose_name='История заказов')
     is_advokat = models.BooleanField(default=False)
     legal_education_check = models.BooleanField(default=False)
-    preferred_location = models.TextField()
-    specialization = models.TextField()
-    incompetence = models.TextField()
+    preferred_location = models.CharField(max_length=150)
+    specialization = models.ManyToManyField(FieldsOfLaw, related_name='lawyer_specialization', db_table='lawyersSpecialization' )
+    incompetence = models.ManyToManyField(FieldsOfLaw, db_table='lawyersIncompetence' )
     current_city = models.CharField(max_length=150)
-    current_location =  PlainLocationField(based_fields=['current_city'], zoom=7)
-    
-    class Meta:
-            verbose_name = "Пользователь-юрист"
-            verbose_name_plural = 'Пользователи-юристы'
+    current_location =  PlainLocationField(based_fields=['current_city'], zoom=7, blank = True)
 
     
+    
+
+
+
 

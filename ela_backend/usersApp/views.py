@@ -19,7 +19,8 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
 
 from usersApp.models import User, UsersKind, ClientUserInterface, LawyerUserInterface
-from usersApp.serializers import RegistrationSerializer, PasswordChangeSerializer, ClientInterfaceSerializer, LoginSerializer
+from usersApp.serializers import RegistrationSerializer, PasswordChangeSerializer,\
+                                 ClientInterfaceSerializer, LoginSerializer, LawyerUserInterfaceSerializer
 from usersApp.utils import get_tokens_for_user
 from usersApp.autth_methods import push_auth_email
 
@@ -86,7 +87,22 @@ class RegistrationClientView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RegistrationLawyerView(APIView):
-    ...
+    def post(self, request:HttpRequest):
+        my_data = request.data
+        if not 'specialization' in my_data or not 'incompetence' in my_data:
+            return Response('Отсутствует необходимые данные о компетенции',
+                            status=status.HTTP_400_BAD_REQUEST)
+        my_data['user_name']= request.user
+        serializer =  LawyerUserInterfaceSerializer(data=my_data)
+        if serializer.is_valid():
+            crud_lawyer = serializer.save()
+            serializer.create_specialization(crud_lawyer, my_data['specialization'] )
+            serializer.create_incompetence(crud_lawyer, my_data['incompetence'] )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
 
 class RegistrationConfirmEmail(APIView):
     def get(self, request:HttpRequest, user):
