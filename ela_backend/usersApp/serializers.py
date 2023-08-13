@@ -36,13 +36,23 @@ class ClientInterfaceSerializer(serializers.ModelSerializer):
                                      user_name = self.validated_data['user_name'],
                                      )
         client.save()
+        return client
+    def split_fullname(self):
         full_name:str = self.validated_data['full_name']
         first_name, last_name = full_name.split(' ')[0], full_name.split(' ')[1]
         current_user:User = self.validated_data['user_name']
         current_user.first_name = first_name
         current_user.last_name = last_name
         current_user.save()
-        return client
+    def check_user(self):
+        current_user:User = self.validated_data['user_name']
+        if current_user.kind_of_user==UsersKind.objects.get(pk=2):
+            return False
+        elif current_user.kind_of_user==None:
+            current_user.kind_of_user==UsersKind.objects.get(pk=1)
+        current_user.kind_of_user==UsersKind.objects.get(pk=1)
+        return True
+        
 
 class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -58,13 +68,16 @@ class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
                                         current_city = self.validated_data['current_city'],
                                         )
         cur_lawyer.save()
+        return cur_lawyer 
+
+    def split_fullname(self):
         full_name:str = self.validated_data['full_name']
         first_name, last_name = full_name.split(' ')[0], full_name.split(' ')[1]
         current_user:User = self.validated_data['user_name']
         current_user.first_name = first_name
         current_user.last_name = last_name
         current_user.save()  
-        return cur_lawyer 
+
 
     def create_specialization(self, inst_interface:LawyerUserInterface, data_specialization):
         #data_specialization = json.loads(data)
@@ -80,12 +93,14 @@ class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
                 current_incompetence = FieldsOfLaw.objects.get(area=area)
                 inst_interface.incompetence.add(current_incompetence)
         return inst_interface
-                    
+    def check_user(self):
+        current_user:User = self.validated_data['user_name']
+        if current_user.kind_of_user==UsersKind.objects.get(pk=1):
+            return False
+        elif current_user.kind_of_user==None:
+            current_user.kind_of_user==UsersKind.objects.get(pk=2)
+        return True
 
-
-
-
-    
         
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()

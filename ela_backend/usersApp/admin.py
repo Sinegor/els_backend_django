@@ -67,7 +67,7 @@ class LawyerUserInterfaceAdmin(admin.ModelAdmin):
               'history_of_applications',  'payment_method',
               'is_advokat', 'legal_education_check',
               'preferred_location', 'specialization', 
-              'incompetence', 'current_city', 'current_location')
+              'incompetence', 'current_city',)
     readonly_fields = ('name_of_interface', 'user_name',
                        'current_applications', 'history_of_applications', )
 

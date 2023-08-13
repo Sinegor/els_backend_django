@@ -24,6 +24,7 @@ class User (AbstractUser):
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Все пользователи'
+        ordering = ['kind_of_user', 'username']
 
     def __str__(self):
         return(self.username)
@@ -41,6 +42,7 @@ class ClientUserInterface(models.Model):
     class Meta:
         verbose_name = "Пользователь-клиент"
         verbose_name_plural = 'Пользователи-клиенты'
+        ordering = ['user_name', 'full_name']
     
     def get_default_type_user():
         return UsersKind.objects.get(id=1)
@@ -71,6 +73,7 @@ class FieldsOfLaw (models.Model):
     class Meta:
         verbose_name = "Отрасль"
         verbose_name_plural = 'Отрасли права'
+        ordering = ['type', 'area']
     area = models.CharField(max_length=70, blank=False, verbose_name='сфера отношений', unique=True)
     type = models.CharField(max_length=25, blank=False, verbose_name='область права')
     def __str__(self):
@@ -89,6 +92,7 @@ class LawyerUserInterface(models.Model):
     class Meta:
             verbose_name = "Пользователь-юрист"
             verbose_name_plural = 'Пользователи-юристы'
+            ordering = ['is_advokat', 'user_name', 'full_name']
     
     def get_default_type_user():
         return UsersKind.objects.get(id=2)

@@ -82,8 +82,12 @@ class RegistrationClientView(APIView):
         my_data['user_name']= current_user
         serializer = ClientInterfaceSerializer(data=my_data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            if serializer.check_user():
+                serializer.save()
+                serializer.split_fullname()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response ("Данный пользователь уже является юристом и не может быть зарегистрирован в качестве клиента", 
+                             status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RegistrationLawyerView(APIView):
@@ -95,14 +99,15 @@ class RegistrationLawyerView(APIView):
         my_data['user_name']= request.user
         serializer =  LawyerUserInterfaceSerializer(data=my_data)
         if serializer.is_valid():
-            crud_lawyer = serializer.save()
-            serializer.create_specialization(crud_lawyer, my_data['specialization'] )
-            serializer.create_incompetence(crud_lawyer, my_data['incompetence'] )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            if serializer.check_user():
+                crud_lawyer = serializer.save()
+                serializer.split_fullname()
+                serializer.create_specialization(crud_lawyer, my_data['specialization'])
+                serializer.create_incompetence(crud_lawyer, my_data['incompetence'])
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response ("Данный пользователь уже является клиентом и не может быть зарегистрирован в качестве юриста",
+                             status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
 
 class RegistrationConfirmEmail(APIView):
     def get(self, request:HttpRequest, user):
