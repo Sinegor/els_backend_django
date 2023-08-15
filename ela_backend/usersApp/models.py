@@ -32,8 +32,9 @@ class User (AbstractUser):
     kind_of_user = models.ForeignKey(UsersKind, 
                                      blank=True, 
                                      null=True, 
-                                     on_delete=models.PROTECT, 
+                                     on_delete=models.SET_NULL, 
                                      verbose_name= 'тип пользователя',
+                                     to_field= 'name'
                                      )
     email_confirm = models.BooleanField(default=False)
     
@@ -122,7 +123,7 @@ class LawyerUserInterface(models.Model):
     is_advokat = models.BooleanField(default=False)
     legal_education_check = models.BooleanField(default=False)
     preferred_location = models.CharField(max_length=150)
-    specialization = models.ManyToManyField(FieldsOfLaw, related_name='lawyer_specialization', db_table='lawyersSpecialization' )
+    specialization = models.ManyToManyField(FieldsOfLaw, related_name='lawyer_specialization', db_table='lawyersSpecialization', blank=True )
     incompetence = models.ManyToManyField(FieldsOfLaw, db_table='lawyersIncompetence' )
     current_city = models.CharField(max_length=150)
     current_location =  PlainLocationField(based_fields=['current_city'], zoom=7, blank = True)
