@@ -2,7 +2,8 @@ from django.urls import path, include
 from usersApp.views import RegistrationView, LoginView, LogoutView, ChangePasswordView, \
                            GetCurrentUserView, RegistrationClientView, \
                            RegistrationLawyerView, RegistrationConfirmEmailView, UpdateUserView,\
-                           UpdateClientView, UpdateLawyerView, ReadUserView, ReadClientView, ReadLawyerView
+                           UpdateClientView, UpdateLawyerView, ReadUserView, ReadClientView, ReadLawyerView,\
+                           DeleteUserView, TestingView
 from rest_framework_simplejwt import views as jwt_views
 
 
@@ -23,5 +24,8 @@ urlpatterns = [
     path('update/lawyer', UpdateLawyerView.as_view()),
     path('read/user', ReadUserView.as_view()),
     path('read/client', ReadClientView.as_view()),
-    path('read/lawyer', ReadLawyerView.as_view())
+    path('read/lawyer', ReadLawyerView.as_view()),
+    path ('delete/user', DeleteUserView.as_view()), 
+    path ('testing', TestingView.as_view())
+
 ]

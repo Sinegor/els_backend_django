@@ -1,5 +1,6 @@
 import io
 import json
+import time
 
 from django.http import HttpResponse, HttpRequest
 from django.db import models
@@ -89,6 +90,7 @@ class RegistrationClientView(APIView):
 
 class RegistrationLawyerView(APIView):
     def post(self, request:HttpRequest):
+        my_time = time.time()
         my_data = request.data
         if not 'specialization' in my_data or not 'incompetence' in my_data:
             return Response('Отсутствует необходимые данные о компетенции',
@@ -96,14 +98,15 @@ class RegistrationLawyerView(APIView):
         my_data['user_name']= request.user
         serializer =  LawyerUserInterfaceSerializer(data=my_data)
         if serializer.is_valid():
-            if serializer.check_user():
+            if serializer.check_user() and serializer.check_actual_law(my_data['specialization'])\
+                                       and serializer.check_actual_law(my_data['incompetence']):
+                serializer.split_fullname()    
                 crud_lawyer = serializer.save()
-                serializer.split_fullname()
                 serializer.create_specialization(crud_lawyer, my_data['specialization'])
                 serializer.create_incompetence(crud_lawyer, my_data['incompetence'])
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response ("Данный пользователь уже является клиентом и не может быть зарегистрирован в качестве юриста",
-                             status=status.HTTP_400_BAD_REQUEST)
+                return Response(f'{time.time()- my_time}/n{serializer.data}', status=status.HTTP_201_CREATED)
+            return Response (f"{time.time()- my_time}/n {serializer.data}Данный пользователь уже является клиентом и не может быть зарегистрирован в качестве юриста",
+                                            status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RegistrationConfirmEmailView(APIView):
@@ -185,13 +188,31 @@ class ReadClientView(APIView):
 
 class ReadLawyerView(APIView):
     def get (self, request:HttpRequest):
-        current_user = request.user
+        current_user = request.user.username    
         current_lawyer = current_user.lawer_user_interface
         serializer = ReadLawyerSerializer(current_lawyer)
         response= serializer.data
         [print(f'{key}: {response[key]}\n') for key in response]
         return Response (response, status=status.HTTP_200_OK)
 
+class DeleteUserView(APIView):
+    def delete (self, request:HttpRequest,):
+        current_user_name = request.user.username
+        if (current_user_name == request.GET['delete_username']) or (request.user.is_superuser == True):
+            current_user = User.objects.get(username=current_user_name)
+            current_user.is_active = False
+            current_user.save()
+            return Response('Uninstalled successfully', status=status.HTTP_200_OK)
+        else:
+            return Response ('There are no permissions to remove this user', status= status.HTTP_400_BAD_REQUEST)
+
+
+class TestingView(APIView):
+    ... # def get (self, request):
+    #     result = get_list_of_law()
+    #     print (type(result))
+    #     print (result)
+    #     return Response ('Ok', status=status.HTTP_200_OK)
 
         
 

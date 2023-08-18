@@ -5,6 +5,8 @@ import smtplib
 from dotenv import load_dotenv
 from email.message import EmailMessage
 from os import getenv
+
+from usersApp.models import FieldsOfLaw
 load_dotenv()
 
 
@@ -21,3 +23,4 @@ def push_auth_email(email, name):
         s.starttls()
         s.login(SMT_LOGIN, SMT_PASS)
         s.send_message(auth_msg)
+

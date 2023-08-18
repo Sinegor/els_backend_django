@@ -8,6 +8,7 @@ from django.contrib.auth import authenticate, login, logout
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
 
+
 class RegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -77,23 +78,40 @@ class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
         current_user.first_name = first_name
         current_user.last_name = last_name
         current_user.save()  
+    
+    def check_actual_law (self, law_data:dict):
+        # надо как-то закешировать актуальные области права:
+        crud_data = FieldsOfLaw.objects.values('area').all()
+        actual_law = []
+        for data in crud_data:
+            actual_law.append(data['area'])
+        for type_of_law in law_data:
+            for law in law_data[type_of_law]:
+                if law not in actual_law:
+                    raise serializers.ValidationError ('Вы указали недопустимую область права')      
+        return True
 
 
     def create_specialization(self, inst_interface:LawyerUserInterface, data_specialization:dict):
-        #data_specialization = json.loads(data)
+        law_data=FieldsOfLaw.objects.all()
         for type_law in data_specialization:
             for area in data_specialization[type_law]:
-                current_specialization = FieldsOfLaw.objects.get(area=area)
-                inst_interface.specialization.add(current_specialization)
-                
+                inst_interface.specialization.add(law_data.get(area=area))
+        inst_interface.save()    
         return inst_interface
+
     
     def create_incompetence(self, inst_interface:LawyerUserInterface, data_incompetence):
+        law_data=FieldsOfLaw.objects.all()
         for type_law in data_incompetence:
             for area in data_incompetence[type_law]:
-                current_incompetence = FieldsOfLaw.objects.get(area=area)
-                inst_interface.incompetence.add(current_incompetence)
+                inst_interface.incompetence.add(law_data.get(area=area))
+        inst_interface.save()    
         return inst_interface
+
+    
+    
+    
     def check_user(self):
         current_user:User = self.validated_data['user_name']
         if current_user.kind_of_user==UsersKind.objects.get(pk=1):
@@ -206,7 +224,10 @@ class ReadLawyerSerializer(serializers.ModelSerializer):
         model = LawyerUserInterface
         exclude= ['name_of_interface',]
         
+    full_name = serializers.CharField()
+    user_name = serializers.SlugRelatedField(many=False, read_only=True, slug_field='username')
     specialization = serializers.SlugRelatedField(many=True, read_only=True, slug_field='area')
+    incompetence = serializers.SlugRelatedField(many=True, read_only=True, slug_field='area')
  
 # class ReadLawyerSerializer(serializers.Serializer):
 #     full_name = serializers.CharField()
