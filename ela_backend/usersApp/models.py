@@ -51,7 +51,7 @@ class ClientUserInterface(models.Model):
     phoneNumberRegex = RegexValidator(regex = r"^\+?1?\d{8,15}$")
     name_of_interface = models.ForeignKey(UsersKind,  
                                           on_delete=models.CASCADE, 
-                                          related_name='client_user_interface',
+                                          related_name='client_interface',
                                           default= get_default_type_user,
                                           verbose_name='тип пользователя',
                                           )

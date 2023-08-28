@@ -10,12 +10,21 @@ from rest_framework.parsers import JSONParser
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
+
+ # Необходимо протестировать с write_only и без. Есть ли разница при таком обозначении или через extra_kwargs
+    # password = serializers.CharField(
+    #     max_length=128,
+    #     min_length=8,
+    #     write_only=True
+    # )
+
+    
     class Meta:
         model = User
         fields = ['username', 'kind_of_user', 'password', 'email']
-        extra_kwargs = {
-            'password': {'write_only': True}
-        }
+        # extra_kwargs = {
+        #     'password': {'write_only': True}
+        # }
     
     
     def save(self):  
@@ -27,10 +36,27 @@ class RegistrationSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField()
+    def user_authenticate(self, request):
+        username = self.validated_data['username']
+        password = self.validated_data['password']
+        user = authenticate(request, username=username, password=password)
+        return user
+  
+
 class ClientInterfaceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClientUserInterface
-        fields = ['full_name', 'phone', 'user_name', ]
+        fields = ['full_name', 'phone', 'user_name', 'payment_method']
+
+        extra_kwargs = {
+            'payment_method':{
+                'default':''
+            }
+        } 
+
     def save(self):
         client = ClientUserInterface(full_name = self.validated_data['full_name'],
                                      phone = self.validated_data['phone'],
@@ -91,25 +117,24 @@ class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError ('Вы указали недопустимую область права')      
         return True
 
-
-    def create_specialization(self, inst_interface:LawyerUserInterface, data_specialization:dict):
+    
+    def create_law_profile (self, inst_interface:LawyerUserInterface, data):
         law_data=FieldsOfLaw.objects.all()
-        for type_law in data_specialization:
-            for area in data_specialization[type_law]:
+        specialization_data = data['specialization']
+        incompetence_data = data['incompetence']
+        used_values = []
+        for type_law in incompetence_data:
+            for area in incompetence_data[type_law]:
+                inst_interface.incompetence.add(law_data.get(area=area))
+                used_values.append(area)
+        for type_law in specialization_data:
+            for area in specialization_data[type_law]:
+                if area in used_values:
+                    inst_interface.delete()
+                    raise serializers.ValidationError('Error. Right fields in specialization and incompetence cannot be the same')      
                 inst_interface.specialization.add(law_data.get(area=area))
         inst_interface.save()    
         return inst_interface
-
-    
-    def create_incompetence(self, inst_interface:LawyerUserInterface, data_incompetence):
-        law_data=FieldsOfLaw.objects.all()
-        for type_law in data_incompetence:
-            for area in data_incompetence[type_law]:
-                inst_interface.incompetence.add(law_data.get(area=area))
-        inst_interface.save()    
-        return inst_interface
-
-    
     
     
     def check_user(self):
@@ -121,15 +146,7 @@ class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
         return True
 
         
-class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
-    password = serializers.CharField()
-    def user_authenticate(self, request):
-        username = self.validated_data['username']
-        password = self.validated_data['password']
-        user = authenticate(request, username=username, password=password)
-        return user
-    
+  
 
 class PasswordChangeSerializer(serializers.Serializer):
     current_password = serializers.CharField(style={"input_type": "password"}, required=True)

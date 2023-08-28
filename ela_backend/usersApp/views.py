@@ -1,23 +1,23 @@
 import io
 import json
 import time
+import jwt
 
 from django.http import HttpResponse, HttpRequest
-from django.db import models
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 
 
 
-from rest_framework import status, authentication, serializers
+from rest_framework import status, authentication, serializers, permissions
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import  Response
 from rest_framework.request import Request
-from rest_framework.views import APIView
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from usersApp.models import User, UsersKind, ClientUserInterface, LawyerUserInterface
 from usersApp.serializers import RegistrationSerializer, PasswordChangeSerializer,\
@@ -27,6 +27,7 @@ from usersApp.serializers import RegistrationSerializer, PasswordChangeSerialize
 
 from usersApp.utils import get_tokens_for_user
 from usersApp.autth_methods import push_auth_email
+from ela_backend.settings import SIGNING_KEY
 
 
 
@@ -102,8 +103,7 @@ class RegistrationLawyerView(APIView):
                                        and serializer.check_actual_law(my_data['incompetence']):
                 serializer.split_fullname()    
                 crud_lawyer = serializer.save()
-                serializer.create_specialization(crud_lawyer, my_data['specialization'])
-                serializer.create_incompetence(crud_lawyer, my_data['incompetence'])
+                serializer.create_law_profile(crud_lawyer, my_data)
                 return Response(f'{time.time()- my_time}/n{serializer.data}', status=status.HTTP_201_CREATED)
             return Response (f"{time.time()- my_time}/n {serializer.data}Данный пользователь уже является клиентом и не может быть зарегистрирован в качестве юриста",
                                             status=status.HTTP_400_BAD_REQUEST)
@@ -115,14 +115,6 @@ class RegistrationConfirmEmailView(APIView):
         current_user.email_confirm = True
         current_user.save()
         return Response('Email confirmed', status=status.HTTP_200_OK)
-
-class GetCurrentUserView (APIView):
-    def get (self, request:HttpRequest):
-        cur_user = request.user
-        print (cur_user.is_authenticated)
-        my_session = request.session
-        print(my_session)
-        return Response ('ok')
 
 class UpdateUserView(APIView):
     def post(self, request:HttpRequest):
@@ -208,12 +200,11 @@ class DeleteUserView(APIView):
 
 
 class TestingView(APIView):
-    ... # def get (self, request):
-    #     result = get_list_of_law()
-    #     print (type(result))
-    #     print (result)
-    #     return Response ('Ok', status=status.HTTP_200_OK)
-
+    permission_classes = (permissions.IsAuthenticated)
+    def get (self, request:HttpRequest):
+                
+        print(request.auth)
+        return Response('ok', status=status.HTTP_200_OK)
         
 
 

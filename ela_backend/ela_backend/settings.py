@@ -26,6 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
+SIGNING_KEY = os.getenv('CRYPTO_SEKRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -44,8 +45,9 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(minutes=3),
+    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(minutes=1),
     'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=1),
+    'SIGNING_KEY': SIGNING_KEY,
 }
 
 
@@ -61,7 +63,8 @@ INSTALLED_APPS = [
     'rest_framework',
 #    'rest_framework.authtoken',
     'corsheaders',
-    'rest_framework_simplejwt'
+    'rest_framework_simplejwt',
+    'legalApplication'
     
     
 ] 

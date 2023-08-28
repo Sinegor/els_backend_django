@@ -1,10 +1,11 @@
 from django.urls import path, include
 from usersApp.views import RegistrationView, LoginView, LogoutView, ChangePasswordView, \
-                           GetCurrentUserView, RegistrationClientView, \
+                        RegistrationClientView, \
                            RegistrationLawyerView, RegistrationConfirmEmailView, UpdateUserView,\
                            UpdateClientView, UpdateLawyerView, ReadUserView, ReadClientView, ReadLawyerView,\
                            DeleteUserView, TestingView
 from rest_framework_simplejwt import views as jwt_views
+
 
 
 
@@ -17,8 +18,9 @@ urlpatterns = [
     path('login', LoginView.as_view(), name='login'),
     path('logout', LogoutView.as_view(), name='logout'),
     path('change-password', ChangePasswordView.as_view(), name='change pass'),
-    path('token-refresh', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
-    path ('current_user',GetCurrentUserView.as_view()),
+    path ('token', jwt_views.TokenObtainPairView.as_view() ),
+    path('token-refresh',jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
+    #path ('current_user',GetCurrentUserView.as_view()),
     path('update/user', UpdateUserView.as_view()), 
     path('update/client', UpdateClientView.as_view()),
     path('update/lawyer', UpdateLawyerView.as_view()),
