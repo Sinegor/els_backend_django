@@ -10,7 +10,7 @@ from legalApplication.serializers import CreateLegalAppSerializer
 from usersApp.models import User
 
 
-class CreateLegalApp (APIView):
+class CreateLegalAppView (APIView):
     permission_classes = [IsAuthenticated,]
     def post (self, request:HttpRequest):
         my_data = request.data
@@ -29,4 +29,12 @@ class CreateLegalApp (APIView):
         return Response('This user is registered as a lawyer and cannot be a client',
                         status=status.HTTP_400_BAD_REQUEST)
 
-        
+class UpdateLegalAppView (APIView):
+    ...
+
+class ReadLegalAppView(APIView):
+    ...
+
+class DeleteLegalAppView(APIView):
+    ...
+

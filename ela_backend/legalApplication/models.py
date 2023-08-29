@@ -61,6 +61,8 @@ class LegalApp(models.Model):
     ]
 
 
+    city = models.CharField(max_length=100, verbose_name='город, в котором необходима помощь')
+
     client = models.ForeignKey(
                                ClientUserInterface,
                                on_delete=models.CASCADE,
@@ -109,10 +111,10 @@ class LegalApp(models.Model):
                                 
     )
 
-    lawer = models.ForeignKey(LawyerUserInterface, 
+    lawyer = models.ForeignKey(LawyerUserInterface, 
                               on_delete=models.PROTECT,
                               blank=True,
-                              default=True
+                              null=True
                               )
     
     def clean(self):

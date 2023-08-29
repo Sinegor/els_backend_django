@@ -1,6 +1,6 @@
 from django.urls import path, include
-from legalApplication.views import CreateLegalApp
+from legalApplication.views import CreateLegalAppView
 
 urlpatterns = [
-    path('create', CreateLegalApp.as_view())
+    path('create', CreateLegalAppView.as_view())
 ]

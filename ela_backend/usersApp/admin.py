@@ -1,10 +1,11 @@
-#from django import forms
+from django.db import models
 from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
 from usersApp.models import User, UsersKind, ClientUserInterface, \
                             LawyerUserInterface, FieldsOfLaw
+
 
 
 # Данный класс переопределяется, если мы хотим переопределить форму для создания юзера. В данном случае в юзер модели мы
@@ -80,5 +81,7 @@ admin.site.register(UsersKind)
 admin.site.register(ClientUserInterface, ClientUserInterfaceAdmin)
 admin.site.register (LawyerUserInterface, LawyerUserInterfaceAdmin)
 admin.site.register(FieldsOfLaw, FieldsOfLawAdmin)
+
+
 
 # Register your models here.
