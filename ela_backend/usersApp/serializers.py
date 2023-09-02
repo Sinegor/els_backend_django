@@ -8,24 +8,13 @@ from django.contrib.auth import authenticate, login, logout
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
 
-
 class RegistrationSerializer(serializers.ModelSerializer):
 
- # Необходимо протестировать с write_only и без. Есть ли разница при таком обозначении или через extra_kwargs
-    # password = serializers.CharField(
-    #     max_length=128,
-    #     min_length=8,
-    #     write_only=True
-    # )
-
-    
     class Meta:
         model = User
         fields = ['username', 'kind_of_user', 'password', 'email']
-        # extra_kwargs = {
-        #     'password': {'write_only': True}
-        # }
-    
+        write_only_fields = ['password',]
+         
     
     def save(self):  
         user = self.create(self.validated_data)
@@ -38,7 +27,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
-    password = serializers.CharField()
+    password = serializers.CharField(write_only=True)
     def user_authenticate(self, request):
         username = self.validated_data['username']
         password = self.validated_data['password']
@@ -50,12 +39,15 @@ class ClientInterfaceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClientUserInterface
         fields = ['full_name', 'phone', 'user_name', 'payment_method']
+        write_only_fields = ['payment_method', 'phone']
 
         extra_kwargs = {
             'payment_method':{
                 'default':''
             }
         } 
+    
+
 
     def save(self):
         client = ClientUserInterface(full_name = self.validated_data['full_name'],
@@ -86,6 +78,7 @@ class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
         model = LawyerUserInterface
         fields = ['full_name', 'phone', 'user_name', 'preferred_location',
                   'preferred_location', 'current_city']
+        write_only_fields = ['phone',]
 
     def save (self):
         cur_lawyer = LawyerUserInterface(full_name = self.validated_data['full_name'],
@@ -105,44 +98,48 @@ class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
         current_user.last_name = last_name
         current_user.save()  
     
-    def check_actual_law (self, law_data:dict):
+    def check_law_data_request(self, data, actual_law):
+            current_incompetence = data.get('incompetence')
+            current_specialization = data.get('specialization')
+            self.check_actual_law(current_incompetence, actual_law)
+            self.check_actual_law(current_specialization, actual_law)
+            return True
+            
+
+    def check_actual_law (self, law_data:dict, actual_law:dict ):
         # надо как-то закешировать актуальные области права:
-        crud_data = FieldsOfLaw.objects.values('area').all()
-        actual_law = []
-        for data in crud_data:
-            actual_law.append(data['area'])
         for type_of_law in law_data:
             for law in law_data[type_of_law]:
-                if law not in actual_law:
-                    raise serializers.ValidationError ('Вы указали недопустимую область права')      
+                if law not in actual_law[type_of_law]:
+                    raise serializers.ValidationError (f'{type_of_law}:{law} - вы указали недопустимую область права')      
         return True
 
-    
-    def create_law_profile (self, inst_interface:LawyerUserInterface, data):
+   
+    def create_law_profile(self, 
+                           inst_interface:LawyerUserInterface, 
+                           data):
         law_data=FieldsOfLaw.objects.all()
-        specialization_data = data['specialization']
-        incompetence_data = data['incompetence']
-        used_values = []
-        for type_law in incompetence_data:
-            for area in incompetence_data[type_law]:
+        used_values_law=[]
+        for type_law in data['incompetence']:
+            for area in data['incompetence'][type_law]:
                 inst_interface.incompetence.add(law_data.get(area=area))
-                used_values.append(area)
-        for type_law in specialization_data:
-            for area in specialization_data[type_law]:
-                if area in used_values:
-                    inst_interface.delete()
-                    raise serializers.ValidationError('Error. Right fields in specialization and incompetence cannot be the same')      
+                used_values_law.append(area)
+        for type_law in data['specialization']:
+            for area in data['specialization'][type_law]:
+                if area in used_values_law:
+                    raise serializers.ValidationError('Error. Right fields in specialization and incompetence cannot be the same')              
                 inst_interface.specialization.add(law_data.get(area=area))
-        inst_interface.save()    
+        inst_interface.save()
         return inst_interface
-    
+
     
     def check_user(self):
         current_user:User = self.validated_data['user_name']
         if current_user.kind_of_user==UsersKind.objects.get(pk=1):
             return False
         elif current_user.kind_of_user==None:
-            current_user.kind_of_user==UsersKind.objects.get(pk=2)
+            current_user.kind_of_user=UsersKind.objects.get(pk=2)
+            current_user.save()
         return True
 
         
@@ -160,7 +157,8 @@ class PasswordChangeSerializer(serializers.Serializer):
 class UpdateUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['email',]
+        fields = ['username','email']
+        read_only_fields = ['username']
         
 
 class UpdateClientSerializer(serializers.ModelSerializer):
@@ -175,12 +173,15 @@ class UpdateClientSerializer(serializers.ModelSerializer):
                 'required':False,
             },   
         }
-    def split_fullname(self, user):
-        full_name:str = self.validated_data['full_name']
-        first_name, last_name = full_name.split(' ')[0], full_name.split(' ')[1]
-        user.first_name = first_name
-        user.last_name = last_name
-        user.save()
+    
+    def check_fullname(self, data, user):
+        if 'full_name' in data:
+            full_name:str = self.validated_data['full_name']
+            first_name, last_name = full_name.split(' ')[0], full_name.split(' ')[1]
+            user.first_name = first_name
+            user.last_name = last_name
+            user.save()
+
 
 class UpdateLawyerSerializer(serializers.ModelSerializer):
     class Meta:
@@ -202,20 +203,66 @@ class UpdateLawyerSerializer(serializers.ModelSerializer):
             },
 
         }   
-    def split_fullname(self, user):
-        full_name:str = self.validated_data['full_name']
-        first_name, last_name = full_name.split(' ')[0], full_name.split(' ')[1]
-        user.first_name = first_name
-        user.last_name = last_name
-        user.save()
+    def check_fullname(self, data, user):
+        if 'full_name' in data:
+            full_name:str = self.validated_data['full_name']
+            first_name, last_name = full_name.split(' ')[0], full_name.split(' ')[1]
+            user.first_name = first_name
+            user.last_name = last_name
+            user.save()
     
-    def create_specialization(self, inst_interface:LawyerUserInterface, data_specialization):
-        #data_specialization = json.loads(data)
-        for type_law in data_specialization:
-            for area in data_specialization[type_law]:
-                current_specialization = FieldsOfLaw.objects.get(area=area)
-                inst_interface.specialization.add(current_specialization)
-        return inst_interface
+    def check_law_data_request(self, lawyer, data, actual_law):
+        if 'incompetence' in data or 'specialization' in data:
+            current_incompetence = data.get('incompetence', None)
+            current_specialization = data.get('specialization', None)
+            if current_incompetence is not None:
+                self.check_actual_law(current_incompetence, actual_law)
+            if current_specialization is not None:
+                self.check_actual_law(current_specialization, actual_law)
+            self.update_law_profile(lawyer, current_specialization, current_incompetence)
+
+    def check_actual_law (self, law_data:dict, actual_law:dict ):
+        # надо как-то закешировать актуальные области права:
+        for type_of_law in law_data:
+            for law in law_data[type_of_law]:
+                if law not in actual_law[type_of_law]:
+                    raise serializers.ValidationError (f'{law}: Вы указали недопустимую область права')      
+        return True
+
+
+    def update_law_profile(self, 
+                           inst_interface:LawyerUserInterface, 
+                           specialization_data=None,
+                           incompetence_data=None):
+        law_data=FieldsOfLaw.objects.all()
+        used_values = []
+        if incompetence_data is not None:
+            inst_interface.incompetence.clear()
+            for type_law in incompetence_data:
+                for area in incompetence_data[type_law]:        
+                    inst_interface.incompetence.add(law_data.get(area=area))
+                    used_values.append(area)
+        else:
+            crud_used_values = inst_interface.incompetence.values_list("area")
+            used_values = [value[0] for value in crud_used_values]
+        if specialization_data is not None:
+            inst_interface.specialization.clear()
+            for type_law in specialization_data:
+                for area in specialization_data[type_law]:        
+                    if area not in used_values:
+                        inst_interface.specialization.add(law_data.get(area=area))
+                    else:
+                        raise serializers.ValidationError(f'Error {area}. Right fields in specialization and incompetence cannot be the same')
+                inst_interface.save()
+                return inst_interface
+        else:
+            crud_specialization_data = inst_interface.specialization.values_list("area")
+            specializations_list = [value[0] for value in crud_specialization_data]
+            for value in used_values:
+                   if value in  specializations_list:
+                       raise serializers.ValidationError(f'Error {value}. Right fields in specialization and incompetence cannot be the same')
+                   inst_interface.save()                       
+                   return inst_interface
     
     def create_incompetence(self, inst_interface:LawyerUserInterface, data_incompetence):
         for type_law in data_incompetence:

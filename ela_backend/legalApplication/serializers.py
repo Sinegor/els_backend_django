@@ -32,3 +32,9 @@ class CreateLegalAppSerializer(serializers.ModelSerializer):
         new_legal_app.save()
         return new_legal_app
 
+class ReadLegalAppSerializer(serializers.ModelSerializer):
+    class Meta():
+        model = LegalApp
+        exclude = ['type_of_law']
+    
+    

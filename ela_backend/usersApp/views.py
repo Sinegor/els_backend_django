@@ -1,7 +1,5 @@
-import io
-import json
+
 import time
-import jwt
 
 from django.http import HttpResponse, HttpRequest
 from django.contrib.auth import authenticate, login, logout
@@ -14,12 +12,8 @@ from rest_framework import status, authentication, serializers, permissions
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import  Response
-from rest_framework.request import Request
-from rest_framework.renderers import JSONRenderer
-from rest_framework.parsers import JSONParser
-from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from usersApp.models import User, UsersKind, ClientUserInterface, LawyerUserInterface
+from usersApp.models import User, LawyerUserInterface, ClientUserInterface, FieldsOfLaw
 from usersApp.serializers import RegistrationSerializer, PasswordChangeSerializer,\
                                  ClientInterfaceSerializer, LoginSerializer, LawyerUserInterfaceSerializer,\
                                  UpdateUserSerializer, UpdateClientSerializer, UpdateLawyerSerializer,\
@@ -74,7 +68,7 @@ class ChangePasswordView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
     
 class RegistrationClientView(APIView):
-    
+    permission_classes = [IsAuthenticated, ]
     def post(self, request:HttpRequest):
         my_data = request.data
         current_user = request.user
@@ -90,8 +84,8 @@ class RegistrationClientView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RegistrationLawyerView(APIView):
+    permission_classes = [IsAuthenticated, ]
     def post(self, request:HttpRequest):
-        my_time = time.time()
         my_data = request.data
         if not 'specialization' in my_data or not 'incompetence' in my_data:
             return Response('Отсутствует необходимые данные о компетенции',
@@ -99,13 +93,13 @@ class RegistrationLawyerView(APIView):
         my_data['user_name']= request.user
         serializer =  LawyerUserInterfaceSerializer(data=my_data)
         if serializer.is_valid():
-            if serializer.check_user() and serializer.check_actual_law(my_data['specialization'])\
-                                       and serializer.check_actual_law(my_data['incompetence']):
+            actual_law_dict = FieldsOfLaw.get_actual_law()
+            if serializer.check_user() and serializer.check_law_data_request(my_data, actual_law_dict):
                 serializer.split_fullname()    
-                crud_lawyer = serializer.save()
+                crud_lawyer = serializer.create(serializer.validated_data)
                 serializer.create_law_profile(crud_lawyer, my_data)
-                return Response(f'{time.time()- my_time}/n{serializer.data}', status=status.HTTP_201_CREATED)
-            return Response (f"{time.time()- my_time}/n {serializer.data}Данный пользователь уже является клиентом и не может быть зарегистрирован в качестве юриста",
+                return Response(f'{serializer.data}', status=status.HTTP_201_CREATED)
+            return Response (f"{request.user}: Данный пользователь уже является клиентом и не может быть зарегистрирован в качестве юриста",
                                             status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -117,51 +111,99 @@ class RegistrationConfirmEmailView(APIView):
         return Response('Email confirmed', status=status.HTTP_200_OK)
 
 class UpdateUserView(APIView):
-    def post(self, request:HttpRequest):
-        my_data = request.data
+    permission_classes = [IsAuthenticated, ]
+    def post(self, request:HttpRequest,):
+        """
+        With this route, user can change their email address. 
+        Admin can change mail from any user
+        """
+        current_user = request.user
+        my_data:dict = request.data
         serializer = UpdateUserSerializer(data=my_data)
-        if serializer.is_valid():
-            current_user = request.user
-            serializer.update(current_user, serializer.validated_data)
-            push_auth_email(serializer.validated_data['email'], current_user.username)
-            return Response ('User updated sucsesfull', status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if not my_data.get('username') or my_data.get('username') == current_user.username:
+            if serializer.is_valid():    
+                serializer.update(current_user, serializer.validated_data)
+                push_auth_email(serializer.validated_data['email'], current_user.username)
+                return Response ('User updated sucsesfull', status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        elif current_user.is_staff == True:
+            if serializer.is_valid():    
+                updaiting_user = User.objects.get(username=my_data['user'])
+                serializer.update(updaiting_user, serializer.validated_data)
+                push_auth_email(serializer.validated_data['email'], my_data['user'])
+                return Response ('User updated sucsesfull', status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response('Для изменения данных этого юзера у вас отсутствуют полномочия',
+                             status=status.HTTP_400_BAD_REQUEST)
+
+
 
 class UpdateClientView(APIView):
+    permission_classes = [IsAuthenticated, ]
     def post(self, request:HttpRequest):
-        my_data = request.data
+        """
+        With this route, user can change their client_interface. 
+        Admin can change any client_interface. 
+        """
+        my_data:dict = request.data
         serializer = UpdateClientSerializer(data=my_data)
-        if serializer.is_valid():
-            current_user = request.user
-            current_client = current_user.client_user_interface
-            serializer.update(current_client, serializer.validated_data)
-            if 'full_name' in serializer.validated_data:
-                serializer.split_fullname(current_user)
-            return Response ('Client interface updated sucsesfull', status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        current_user = request.user
+        current_client:ClientUserInterface = getattr(current_user, 'client_user_interface', 'nobody')
+        if current_client == 'nobody' and not my_data.get('client_id', False):
+            return Response('You have not provided information about the customer whose profile you want to change',
+                            status=status.HTTP_400_BAD_REQUEST)
+        elif (current_client !='nobody' and not my_data.get('client_id', False)) or (current_client !='nobody' and current_client.pk == my_data.get('client_id', False)):
+            if serializer.is_valid():
+                serializer.update(current_client, serializer.validated_data)
+                serializer.check_fullname(serializer.validated_data, current_user)
+                return Response ('Client interface updated sucsesfull', status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            if current_user.is_staff == True:
+                if serializer.is_valid():    
+                    updaiting_client = ClientUserInterface.objects.get(pk=my_data.get('client_id'))
+                    serializer.update(updaiting_client, serializer.validated_data)
+                    serializer.check_fullname(serializer.validated_data, updaiting_client.user_name)
+                    return Response ('Client interface updated sucsesfull', status=status.HTTP_201_CREATED)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response('Для изменения данных этого юзера у вас отсутствуют полномочия',
+                             status=status.HTTP_400_BAD_REQUEST)
+
+        
     
 class UpdateLawyerView(APIView):
+    
+    permission_classes = [IsAuthenticated, ]    
     def post(self, request:HttpRequest):
-        my_data = request.data
+        my_data:dict = request.data
+        current_user = request.user
+        current_lawyer:LawyerUserInterface = getattr(current_user, 'lawyer_user_interface', 'nobody')
         serializer = UpdateLawyerSerializer(data=my_data)
-        if serializer.is_valid():
-            current_user = request.user
-            current_lawyer:LawyerUserInterface = current_user.lawer_user_interface
-            serializer.update(current_lawyer, serializer.validated_data)
-            if 'full_name' in serializer.validated_data:
-                serializer.split_fullname(current_user)
-            if 'incompetence' in my_data:
-                current_lawyer.incompetence.clear()    
-                incompetence_data = my_data['incompetence']
-                serializer.create_incompetence(current_lawyer, incompetence_data)
-            if 'specialization' in my_data:
-                specialization_data = my_data['specialization']
-                current_lawyer.specialization.clear()
-                serializer.create_specialization(current_lawyer, specialization_data)
-            return Response ('Lawyer interface updated sucsesfull', status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if current_lawyer == 'nobody' and not my_data.get('lawyer_id', False):
+            return Response('You have not provided information about the lawyer whose profile you want to change',
+                            status=status.HTTP_400_BAD_REQUEST)
+        actual_law_list = FieldsOfLaw.get_actual_law()
+        if (current_lawyer !='nobody' and not my_data.get('lawyer_id', False)) or (current_lawyer !='nobody' and current_lawyer.pk == my_data.get('lawyer_id', False)):
+            if serializer.is_valid():
+                serializer.update(current_lawyer, serializer.validated_data)
+                serializer.check_fullname(serializer.validated_data, current_user)
+                serializer.check_law_data_request(current_lawyer, my_data, actual_law_list)
+                return Response ('Lawyer interface updated sucsesfull', status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        elif current_user.is_staff == True:
+            if serializer.is_valid():    
+                updaiting_lawyer = LawyerUserInterface.objects.get(pk=my_data.get('lawyer_id'))
+                serializer.update(updaiting_lawyer, serializer.validated_data)
+                serializer.check_fullname(serializer.validated_data, updaiting_lawyer.user_name)
+                serializer.check_law_data_request(updaiting_lawyer, my_data, actual_law_list)
+                return Response ('Lawyer interface updated sucsesfull', status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response('Для изменения данных этого юзера у вас отсутствуют полномочия',status=status.HTTP_400_BAD_REQUEST )
 
+              
 class ReadUserView(APIView):
+    permission_classes = [IsAuthenticated, ]
     def get(self, request:HttpRequest):
         current_user = request.user
         serializer = ReadUserSerializer(current_user)
@@ -170,6 +212,7 @@ class ReadUserView(APIView):
         return Response (response, status=status.HTTP_200_OK)
 
 class ReadClientView(APIView):
+    permission_classes = [IsAuthenticated, ]
     def get (self, request:HttpRequest):
         current_user = request.user
         current_client = current_user.client_user_interface
@@ -179,15 +222,17 @@ class ReadClientView(APIView):
         return Response (response, status=status.HTTP_200_OK)
 
 class ReadLawyerView(APIView):
+    permission_classes = [IsAuthenticated, ]
     def get (self, request:HttpRequest):
-        current_user = request.user.username    
-        current_lawyer = current_user.lawer_user_interface
+        current_user = request.user 
+        current_lawyer = current_user.lawyer_user_interface
         serializer = ReadLawyerSerializer(current_lawyer)
         response= serializer.data
         [print(f'{key}: {response[key]}\n') for key in response]
         return Response (response, status=status.HTTP_200_OK)
 
 class DeleteUserView(APIView):
+    permission_classes = [IsAuthenticated, ]
     def delete (self, request:HttpRequest,):
         current_user_name = request.user.username
         if (current_user_name == request.GET['delete_username']) or (request.user.is_superuser == True):

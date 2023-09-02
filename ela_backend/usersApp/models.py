@@ -2,7 +2,7 @@ from django.db import models
 
 from django.contrib.auth.models import AbstractUser
 
-from django.contrib.auth.validators import UnicodeUsernameValidator
+
 from location_field.forms.plain import PlainLocationField
 #?:
 #from django.utils.translation import ugettext_lazy as _
@@ -79,6 +79,20 @@ class FieldsOfLaw (models.Model):
     type = models.CharField(max_length=25, blank=False, verbose_name='область права')
     def __str__(self):
         return self.area
+    
+    @classmethod
+    def get_actual_law(cls):
+        data_of_criminal_law = cls.objects.values_list('area').filter(type='уголовное')
+        data_of_civil_law = cls.objects.values_list('area').filter(type='гражданское')
+        data_of_adm_law = cls.objects.values_list('area').filter(type='административное')
+        result = {}
+        result['уголовное'] = [law[0] for law in data_of_criminal_law]
+        result['гражданское'] = [law[0] for law in data_of_civil_law]
+        result['административное'] = [law[0] for law in data_of_adm_law]
+        return result
+    
+
+
 
 # class Specialization (models.Model):
 #     lawyer = models.ForeignKey('LawyerUserInterface', on_delete=models.CASCADE, to_field='username')
@@ -105,11 +119,11 @@ class LawyerUserInterface(models.Model):
     name_of_interface = models.ForeignKey(UsersKind, 
                                           default=get_default_type_user,
                                           on_delete=models.CASCADE, 
-                                          related_name='lawer_user_interface',
+                                          related_name='lawyer_user_interface',
                                           verbose_name='тип пользователя'
                                           )
     user_name = models.OneToOneField(User,on_delete=models.CASCADE, 
-                                   related_name='lawer_user_interface',
+                                   related_name='lawyer_user_interface',
                                    verbose_name='пользователь',
                                    to_field= 'username' 
                                    )
