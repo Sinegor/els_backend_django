@@ -206,25 +206,50 @@ class ReadUserView(APIView):
     permission_classes = [IsAuthenticated, ]
     def get(self, request:HttpRequest):
         current_user = request.user
-        serializer = ReadUserSerializer(current_user)
-        response= serializer.data
-        [print(f'{key}: {response[key]}\n') for key in response]
-        return Response (response, status=status.HTTP_200_OK)
+        if request.GET.get('user_id', False):
+            if current_user.is_staff or current_user.pk == int(request.GET['user_id']):
+                requested_user = User.objects.get(pk=request.GET['user_id'])
+                serializer = ReadUserSerializer(requested_user)
+                response= serializer.data
+                [print(f'{key}: {response[key]}\n') for key in response]
+                return Response (response, status=status.HTTP_200_OK)
+            else:
+
+                return Response('Для просмотра данных этого юзера у вас отсутствуют полномочия', status=status.HTTP_400_BAD_REQUEST)
+        else:
+            serializer = ReadUserSerializer(current_user)
+            response= serializer.data
+            [print(f'{key}: {response[key]}\n') for key in response]
+            return Response (response, status=status.HTTP_200_OK)
 
 class ReadClientView(APIView):
     permission_classes = [IsAuthenticated, ]
     def get (self, request:HttpRequest):
         current_user = request.user
-        current_client = current_user.client_user_interface
-        serializer = ReadClientSerializer(current_client)
-        response= serializer.data
-        [print(f'{key}: {response[key]}\n') for key in response]
-        return Response (response, status=status.HTTP_200_OK)
+        current_client:ClientUserInterface = getattr(current_user, 'client_user_interface', 'nobody')
+        if current_client == 'nobody' and not request.GET.get('client_id', False):
+            return Response('You have not provided information about the customer whose profile you want to change',
+                            status=status.HTTP_400_BAD_REQUEST)
+        elif (current_client !='nobody' and not request.GET.get('client_id', False)) or (current_client !='nobody' and current_client.pk == int(request.GET.get('client_id', False))):
+            serializer = ClientInterfaceSerializer(current_client)
+            response = serializer.data
+            return Response (response, status=status.HTTP_201_CREATED)
+        else:
+            if current_user.is_staff == True:
+                requesting_client = ClientUserInterface.objects.get(pk= request.GET.get('client_id', False))
+                serializer = ClientInterfaceSerializer(requesting_client)
+                
+                return Response (serializer.data, status=status.HTTP_201_CREATED)
+                
+            return Response('Для чтения данных этого клиента у вас отсутствуют полномочия',
+                             status=status.HTTP_400_BAD_REQUEST)
+
 
 class ReadLawyerView(APIView):
     permission_classes = [IsAuthenticated, ]
     def get (self, request:HttpRequest):
-        current_user = request.user 
+        current_user = request.user
+        
         current_lawyer = current_user.lawyer_user_interface
         serializer = ReadLawyerSerializer(current_lawyer)
         response= serializer.data

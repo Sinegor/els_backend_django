@@ -12,8 +12,10 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['username', 'kind_of_user', 'password', 'email']
+        fields = ['username', 'kind_of_user', 'password',
+                'email', 'is_staff', 'date_joined']
         write_only_fields = ['password',]
+ #       read_only_fields = ['date_joined', 'is_staff']
          
     
     def save(self):  
@@ -24,6 +26,13 @@ class RegistrationSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
+class ReadUserSerializer(serializers.ModelSerializer):
+    class Meta():
+        model = User
+        fields = ['username', 'first_name', 'last_name', 'email',
+                  'date_joined', 'last_login', 'is_superuser', 'is_staff', 'kind_of_user']
+
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
@@ -47,8 +56,6 @@ class ClientInterfaceSerializer(serializers.ModelSerializer):
             }
         } 
     
-
-
     def save(self):
         client = ClientUserInterface(full_name = self.validated_data['full_name'],
                                      phone = self.validated_data['phone'],
@@ -271,11 +278,6 @@ class UpdateLawyerSerializer(serializers.ModelSerializer):
                 inst_interface.incompetence.add(current_incompetence)
         return inst_interface
 
-class ReadUserSerializer(serializers.ModelSerializer):
-    class Meta():
-        model = User
-        fields = ['username', 'first_name', 'last_name', 'email',
-                  'date_joined', 'last_login', 'is_superuser', 'is_staff', 'kind_of_user']
 
 class ReadClientSerializer(serializers.ModelSerializer):
     class Meta():
@@ -292,6 +294,7 @@ class ReadLawyerSerializer(serializers.ModelSerializer):
     user_name = serializers.SlugRelatedField(many=False, read_only=True, slug_field='username')
     specialization = serializers.SlugRelatedField(many=True, read_only=True, slug_field='area')
     incompetence = serializers.SlugRelatedField(many=True, read_only=True, slug_field='area')
+    is_advokat = serializers.BooleanField(read_only=True)
  
 # class ReadLawyerSerializer(serializers.Serializer):
 #     full_name = serializers.CharField()
