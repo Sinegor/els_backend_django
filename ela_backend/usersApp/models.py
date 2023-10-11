@@ -36,6 +36,7 @@ class User (AbstractUser):
                                      verbose_name= 'тип пользователя',
                                      to_field= 'name'
                                      )
+    email = models.EmailField()
     email_confirm = models.BooleanField(default=False)
     
 

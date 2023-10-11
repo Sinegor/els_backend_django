@@ -7,31 +7,31 @@ from django.http import HttpResponse, HttpRequest
 from django.contrib.auth import authenticate, login, logout
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
+from rest_framework.utils import model_meta 
+
 
 class RegistrationSerializer(serializers.ModelSerializer):
-
+    
     class Meta:
         model = User
-        fields = ['username', 'kind_of_user', 'password',
-                'email', 'is_staff', 'date_joined']
-        write_only_fields = ['password',]
- #       read_only_fields = ['date_joined', 'is_staff']
+        fields=  ['username', 'email', 'password',
+                  'kind_of_user', 'is_staff', 'date_joined']
+        
+        extra_kwargs= {
+            'password': {
+                'write_only':True       
+            },
+            
+        }
+        read_only_fields = ['date_joined', 'is_staff']
          
     
     def save(self):  
         user = self.create(self.validated_data)
-        # User(email=self.validated_data['email'], username = self.validated_data['username'])
-        # user.kind_of_user = self.validated_data['kind_of_user']
         password = self.validated_data['password']
         user.set_password(password)
         user.save()
         return user
-
-class ReadUserSerializer(serializers.ModelSerializer):
-    class Meta():
-        model = User
-        fields = ['username', 'first_name', 'last_name', 'email',
-                  'date_joined', 'last_login', 'is_superuser', 'is_staff', 'kind_of_user']
 
 
 class LoginSerializer(serializers.Serializer):
@@ -44,18 +44,59 @@ class LoginSerializer(serializers.Serializer):
         return user
   
 
-class ClientInterfaceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ClientUserInterface
-        fields = ['full_name', 'phone', 'user_name', 'payment_method']
-        write_only_fields = ['payment_method', 'phone']
+# class ClientInterfaceSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = ClientUserInterface
+#         fields = ['full_name', 'phone', 'user_name', 'payment_method',
+#                  'current_requests', 'history_of_requests']
+#         read_only_fields= ['current_requests', 'history_of_requests']
 
-        extra_kwargs = {
-            'payment_method':{
-                'default':''
-            }
-        } 
+#         extra_kwargs = {
+#             'payment_method':{
+#                 'default':'',
+#                 'write_only': True
+#             }
+  #      } 
+
+# class ClientUserInterfaceSerializer(serializers.ModelSerializer):
+#     full_name = serializers.SerializerMethodField()
+#     def get_full_name(self, obj:ClientUserInterface):
+#         full_name:str = self.initial_data['full_name']
+#         first_name, last_name = full_name.split(' ')[0], full_name.split(' ')[1]
+#         cur_user = self.validated_data['user_name']
+#         cur_user.first_name = first_name
+#         cur_user.last_name = last_name
+#         cur_user.save()
+#         return full_name
     
+#     class Meta:
+#         model = ClientUserInterface
+#         fields = ('name_of_interface', 'phone', 'user_name', 'payment_method', 
+#                   'current_requests', 'history_of_requests', 'full_name')
+
+    # def save(self):
+    #     client = ClientUserInterface(#full_name = self.validated_data['full_name'],
+    #                                  phone = self.validated_data['phone'],
+    #                                  user_name = self.validated_data['user_name'],
+    #                                  )
+    #     client.save()
+    #     return client
+
+class ClientUserInterfaceSerializer(serializers.Serializer):
+    
+    full_name = serializers.CharField()
+    name_of_interface = serializers.PrimaryKeyRelatedField(read_only=True,
+                                                           many=False)
+    
+    phone = serializers.CharField()
+    user_name = serializers.SlugRelatedField(#read_only=True,
+                                                   queryset= User.objects.all(),
+                                                   many=False,
+                                                   slug_field = 'username')
+    payment_method =serializers.CharField(default='', write_only=True)
+    current_requests = serializers.CharField(read_only=True)
+    history_of_requests = serializers.CharField(read_only=True)
+
     def save(self):
         client = ClientUserInterface(full_name = self.validated_data['full_name'],
                                      phone = self.validated_data['phone'],
@@ -63,13 +104,17 @@ class ClientInterfaceSerializer(serializers.ModelSerializer):
                                      )
         client.save()
         return client
-    def split_fullname(self):
-        full_name:str = self.validated_data['full_name']
-        first_name, last_name = full_name.split(' ')[0], full_name.split(' ')[1]
-        current_user:User = self.validated_data['user_name']
-        current_user.first_name = first_name
-        current_user.last_name = last_name
-        current_user.save()
+    
+    def check_fullname(self, data, user):
+        if 'full_name' in data:
+            full_name:str = self.validated_data['full_name']
+            first_name, last_name = full_name.split(' ')[0], full_name.split(' ')[1]
+            user.first_name = first_name
+            user.last_name = last_name
+            user.save()
+    
+    
+
     def check_user(self):
         current_user:User = self.validated_data['user_name']
         if current_user.kind_of_user==UsersKind.objects.get(pk=2):
@@ -78,6 +123,18 @@ class ClientInterfaceSerializer(serializers.ModelSerializer):
             current_user.kind_of_user==UsersKind.objects.get(pk=1)
         current_user.kind_of_user==UsersKind.objects.get(pk=1)
         return True
+    
+    def update(self, instance, validated_data):
+        info = model_meta.get_field_info(instance)
+        m2m_fields = []
+        for attr, value in validated_data.items():
+            if attr in info.relations and info.relations[attr].to_many:
+                m2m_fields.append((attr, value))
+            else:
+                setattr(instance, attr, value)
+
+        instance.save()
+
         
 
 class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
@@ -86,6 +143,7 @@ class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
         fields = ['full_name', 'phone', 'user_name', 'preferred_location',
                   'preferred_location', 'current_city']
         write_only_fields = ['phone',]
+    
 
     def save (self):
         cur_lawyer = LawyerUserInterface(full_name = self.validated_data['full_name'],
@@ -104,6 +162,10 @@ class LawyerUserInterfaceSerializer(serializers.ModelSerializer):
         current_user.first_name = first_name
         current_user.last_name = last_name
         current_user.save()  
+
+    
+
+
     
     def check_law_data_request(self, data, actual_law):
             current_incompetence = data.get('incompetence')
@@ -279,11 +341,7 @@ class UpdateLawyerSerializer(serializers.ModelSerializer):
         return inst_interface
 
 
-class ReadClientSerializer(serializers.ModelSerializer):
-    class Meta():
-        model = ClientUserInterface
-        fields = ['user_name', 'full_name', 'phone', 'payment_method',
-                  'current_requests', 'history_of_requests']
+
 
 class ReadLawyerSerializer(serializers.ModelSerializer):
     class Meta():

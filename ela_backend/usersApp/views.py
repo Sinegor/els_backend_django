@@ -12,12 +12,13 @@ from rest_framework import status, authentication, serializers, permissions
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import  Response
+from rest_framework.renderers import JSONRenderer
 
 from usersApp.models import User, LawyerUserInterface, ClientUserInterface, FieldsOfLaw
 from usersApp.serializers import RegistrationSerializer, PasswordChangeSerializer,\
-                                 ClientInterfaceSerializer, LoginSerializer, LawyerUserInterfaceSerializer,\
-                                 UpdateUserSerializer, UpdateClientSerializer, UpdateLawyerSerializer,\
-                                 ReadUserSerializer, ReadClientSerializer, ReadLawyerSerializer
+                                 ClientUserInterfaceSerializer, LoginSerializer, LawyerUserInterfaceSerializer,\
+                                UpdateLawyerSerializer
+                                 #UpdateUserSerializer, UpdateClientSerializer,
 
 from usersApp.utils import get_tokens_for_user
 from usersApp.autth_methods import push_auth_email
@@ -26,13 +27,13 @@ from ela_backend.settings import SIGNING_KEY
 
 
 class RegistrationView(APIView):
-# permission_classes устанавливает, для кого доступен данный ендпоинт, в данном случае для всех.
+
     permission_classes = (AllowAny,)
     def post(self, request:HttpRequest):  
         serializer = RegistrationSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            push_auth_email(serializer.validated_data['email'], serializer.validated_data['username'])
+#            push_auth_email(serializer.validated_data['email'], serializer.validated_data['username'])
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -73,11 +74,12 @@ class RegistrationClientView(APIView):
         my_data = request.data
         current_user = request.user
         my_data['user_name']= current_user
-        serializer = ClientInterfaceSerializer(data=my_data)
+        serializer = ClientUserInterfaceSerializer(data=my_data)
         if serializer.is_valid():
             if serializer.check_user():
                 serializer.save()
-                serializer.split_fullname()
+#                serializer.create(serializer.validated_data)
+                serializer.check_fullname(my_data, current_user)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response ("Данный пользователь уже является юристом и не может быть зарегистрирован в качестве клиента", 
                              status=status.HTTP_400_BAD_REQUEST)
@@ -119,7 +121,7 @@ class UpdateUserView(APIView):
         """
         current_user = request.user
         my_data:dict = request.data
-        serializer = UpdateUserSerializer(data=my_data)
+        serializer = RegistrationSerializer(data=my_data)
         if not my_data.get('username') or my_data.get('username') == current_user.username:
             if serializer.is_valid():    
                 serializer.update(current_user, serializer.validated_data)
@@ -147,13 +149,23 @@ class UpdateClientView(APIView):
         Admin can change any client_interface. 
         """
         my_data:dict = request.data
-        serializer = UpdateClientSerializer(data=my_data)
         current_user = request.user
         current_client:ClientUserInterface = getattr(current_user, 'client_user_interface', 'nobody')
         if current_client == 'nobody' and not my_data.get('client_id', False):
             return Response('You have not provided information about the customer whose profile you want to change',
                             status=status.HTTP_400_BAD_REQUEST)
         elif (current_client !='nobody' and not my_data.get('client_id', False)) or (current_client !='nobody' and current_client.pk == my_data.get('client_id', False)):
+            if not request.data.get('full_name', False):
+                my_data['full_name'] = current_client.full_name
+            if not request.data.get('phone', False):
+                my_data['phone'] = current_client.phone
+            if not request.data.get('user_name', False):
+                my_data['user_name'] = current_client.user_name
+            if not request.data.get('name_of_interface', False):
+                    my_data['name_of_interface']= current_client.name_of_interface.pk
+
+
+            serializer = ClientUserInterfaceSerializer(data=my_data)
             if serializer.is_valid():
                 serializer.update(current_client, serializer.validated_data)
                 serializer.check_fullname(serializer.validated_data, current_user)
@@ -161,8 +173,18 @@ class UpdateClientView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         else:
             if current_user.is_staff == True:
+                updaiting_client = ClientUserInterface.objects.get(pk=my_data.get('client_id'))
+                if not request.data.get('full_name', False):
+                    my_data['full_name'] = updaiting_client.full_name
+                if not request.data.get('phone', False):
+                    my_data['phone'] = updaiting_client.phone
+                if not request.data.get('user_name', False):
+                    my_data['user_name'] = updaiting_client.user_name
+                if not request.data.get('name_of_interface', False):
+                    my_data['name_of_interface']= updaiting_client.name_of_interface.pk
+
+                serializer = ClientUserInterfaceSerializer(data=my_data)
                 if serializer.is_valid():    
-                    updaiting_client = ClientUserInterface.objects.get(pk=my_data.get('client_id'))
                     serializer.update(updaiting_client, serializer.validated_data)
                     serializer.check_fullname(serializer.validated_data, updaiting_client.user_name)
                     return Response ('Client interface updated sucsesfull', status=status.HTTP_201_CREATED)
@@ -209,7 +231,7 @@ class ReadUserView(APIView):
         if request.GET.get('user_id', False):
             if current_user.is_staff or current_user.pk == int(request.GET['user_id']):
                 requested_user = User.objects.get(pk=request.GET['user_id'])
-                serializer = ReadUserSerializer(requested_user)
+                serializer = RegistrationSerializer(requested_user)
                 response= serializer.data
                 [print(f'{key}: {response[key]}\n') for key in response]
                 return Response (response, status=status.HTTP_200_OK)
@@ -217,9 +239,8 @@ class ReadUserView(APIView):
 
                 return Response('Для просмотра данных этого юзера у вас отсутствуют полномочия', status=status.HTTP_400_BAD_REQUEST)
         else:
-            serializer = ReadUserSerializer(current_user)
-            response= serializer.data
-            [print(f'{key}: {response[key]}\n') for key in response]
+            serializer = RegistrationSerializer(current_user)
+            response = serializer.data
             return Response (response, status=status.HTTP_200_OK)
 
 class ReadClientView(APIView):
@@ -231,13 +252,13 @@ class ReadClientView(APIView):
             return Response('You have not provided information about the customer whose profile you want to change',
                             status=status.HTTP_400_BAD_REQUEST)
         elif (current_client !='nobody' and not request.GET.get('client_id', False)) or (current_client !='nobody' and current_client.pk == int(request.GET.get('client_id', False))):
-            serializer = ClientInterfaceSerializer(current_client)
+            serializer = ClientUserInterfaceSerializer(current_client)
             response = serializer.data
             return Response (response, status=status.HTTP_201_CREATED)
         else:
             if current_user.is_staff == True:
                 requesting_client = ClientUserInterface.objects.get(pk= request.GET.get('client_id', False))
-                serializer = ClientInterfaceSerializer(requesting_client)
+                serializer = ClientUserInterfaceSerializer(requesting_client)
                 
                 return Response (serializer.data, status=status.HTTP_201_CREATED)
                 
@@ -246,15 +267,16 @@ class ReadClientView(APIView):
 
 
 class ReadLawyerView(APIView):
-    permission_classes = [IsAuthenticated, ]
-    def get (self, request:HttpRequest):
-        current_user = request.user
+    ...
+    # permission_classes = [IsAuthenticated, ]
+    # def get (self, request:HttpRequest):
+    #     current_user = request.user
         
-        current_lawyer = current_user.lawyer_user_interface
-        serializer = ReadLawyerSerializer(current_lawyer)
-        response= serializer.data
-        [print(f'{key}: {response[key]}\n') for key in response]
-        return Response (response, status=status.HTTP_200_OK)
+    #     current_lawyer = current_user.lawyer_user_interface
+    #     serializer = ReadLawyerSerializer(current_lawyer)
+    #     response= serializer.data
+    #     [print(f'{key}: {response[key]}\n') for key in response]
+    #     return Response (response, status=status.HTTP_200_OK)
 
 class DeleteUserView(APIView):
     permission_classes = [IsAuthenticated, ]
